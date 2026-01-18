@@ -6,7 +6,7 @@ GOARCH               ?= $(shell go env GOARCH)
 
 # Defaults
 REGISTRY        ?= ghcr.io
-REPOSITORY      ?= projectcapsule/capsule
+REPOSITORY      ?= corentinptrl/capsule-coredns
 GIT_TAG_COMMIT  ?= $(shell git rev-parse --short $(VERSION))
 GIT_MODIFIED_1  ?= $(shell git diff $(GIT_HEAD_COMMIT) $(GIT_TAG_COMMIT) --quiet && echo "" || echo ".dev")
 GIT_MODIFIED_2  ?= $(shell git diff --quiet && echo "" || echo ".dirty")
@@ -16,7 +16,11 @@ BUILD_DATE      ?= $(shell git log -1 --format="%at" | xargs -I{} sh -c 'if [ "$
 IMG_BASE        ?= $(REPOSITORY)
 IMG             ?= $(IMG_BASE):$(VERSION)
 CAPSULE_IMG     ?= $(REGISTRY)/$(IMG_BASE)
-CLUSTER_NAME    ?= capsule
+CAPSULE_VERSION ?= "0.12.4"
+CLUSTER_NAME    ?= capsule-coredns
+
+## Kubernetes Version Support
+KUBERNETES_SUPPORTED_VERSION ?= "v1.34.0"
 
 ## Tool Binaries
 KUBECTL ?= kubectl
@@ -58,11 +62,29 @@ golint-fix: golangci-lint
 	$(GOLANGCI_LINT) run -c .golangci.yaml --verbose --fix
 
 GOLANGCI_LINT          := $(LOCALBIN)/golangci-lint
-GOLANGCI_LINT_VERSION  := v2.7.2
+GOLANGCI_LINT_VERSION  := v2.8.0
 GOLANGCI_LINT_LOOKUP   := golangci/golangci-lint
 golangci-lint: ## Download golangci-lint locally if necessary.
 	@test -s $(GOLANGCI_LINT) && $(GOLANGCI_LINT) -h | grep -q $(GOLANGCI_LINT_VERSION) || \
 	$(call go-install-tool,$(GOLANGCI_LINT),github.com/$(GOLANGCI_LINT_LOOKUP)/v2/cmd/golangci-lint@$(GOLANGCI_LINT_VERSION))
+
+GINKGO := $(LOCALBIN)/ginkgo
+ginkgo:
+	$(call go-install-tool,$(GINKGO),github.com/onsi/ginkgo/v2/ginkgo)
+
+CT         := $(LOCALBIN)/ct
+CT_VERSION := v3.14.0
+CT_LOOKUP  := helm/chart-testing
+ct:
+	@test -s $(CT) && $(CT) version | grep -q $(CT_VERSION) || \
+	$(call go-install-tool,$(CT),github.com/$(CT_LOOKUP)/v3/ct@$(CT_VERSION))
+
+KIND         := $(LOCALBIN)/kind
+KIND_VERSION := v0.30.0
+KIND_LOOKUP  := kubernetes-sigs/kind
+kind:
+	@test -s $(KIND) && $(KIND) --version | grep -q $(KIND_VERSION) || \
+	$(call go-install-tool,$(KIND),sigs.k8s.io/kind/cmd/kind@$(KIND_VERSION))
 
 # go-install-tool will 'go install' any package $2 and install it to $1.
 PROJECT_DIR := $(shell dirname $(abspath $(lastword $(MAKEFILE_LIST))))
@@ -72,3 +94,69 @@ define go-install-tool
     GOBIN=$(LOCALBIN) go install $(2) ;\
 }
 endef
+
+.PHONY: docker-build
+
+docker-build:
+	@if [ ! -d coredns ]; then \
+		git clone https://github.com/coredns/coredns; \
+	fi
+	@mkdir -p coredns/plugin/capsule
+	@cp -f *.go coredns/plugin/capsule/
+	@cp -f go.mod coredns/plugin/capsule/
+	@grep -q '^replace github.com/CorentinPtrl/capsule_coredns => ./plugin/capsule' coredns/go.mod || \
+		sed -i '/^go /a replace github.com/CorentinPtrl/capsule_coredns => ./plugin/capsule' coredns/go.mod
+	@sed -i '/^capsule:github.com\/CorentinPtrl\/capsule_coredns/d' coredns/plugin.cfg
+	@grep -q '^capsule:github.com/CorentinPtrl/capsule_coredns' coredns/plugin.cfg || \
+		sed -i '/kubernetes:kubernetes/i capsule:github.com/CorentinPtrl/capsule_coredns' coredns/plugin.cfg
+	@cd coredns && GOFLAGS=-mod=mod go generate
+	@cd coredns && go mod tidy
+	@cd coredns && GOFLAGS="-buildvcs=false" make gen
+	@cd coredns && GOFLAGS="-buildvcs=false" make
+	@docker build \
+		--no-cache \
+		-t $(CAPSULE_IMG):latest \
+		-t $(CAPSULE_IMG):$(VERSION) \
+		-f coredns/Dockerfile coredns
+
+
+# Running e2e tests in a KinD instance
+.PHONY: e2e
+e2e: ginkgo
+	$(MAKE) docker-build && $(MAKE) e2e-build && $(MAKE) e2e-exec
+
+e2e-build: kind
+	$(MAKE) e2e-build-cluster
+	$(MAKE) e2e-load-image
+	$(MAKE) e2e-install
+
+e2e-build-cluster: kind
+	$(KIND) create cluster --wait=60s --name $(CLUSTER_NAME) --image kindest/node:$(KUBERNETES_SUPPORTED_VERSION)
+
+.PHONY: e2e-load-image
+e2e-load-image: kind
+	$(KIND) load docker-image $(CAPSULE_IMG):latest --name $(CLUSTER_NAME)
+
+.PHONY: e2e-install
+e2e-install:
+	$(HELM) upgrade \
+	    --dependency-update \
+		--debug \
+		--install \
+		--namespace capsule-system \
+		--create-namespace \
+		 --version $(CAPSULE_VERSION) \
+		--set 'manager.livenessProbe.failureThreshold=10' \
+		--set 'webhooks.hooks.nodes.enabled=true' \
+		--set "webhooks.exclusive=true"\
+		capsule \
+		oci://ghcr.io/projectcapsule/charts/capsule
+	@$(KUBECTL) apply -f hack/coredns.yaml
+
+.PHONY: e2e-exec
+e2e-exec: ginkgo
+	$(GINKGO) -v -tags e2e ./e2e
+
+.PHONY: e2e-destroy
+e2e-destroy: kind
+	$(KIND) delete cluster --name $(CLUSTER_NAME)
