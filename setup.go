@@ -26,10 +26,11 @@ func setup(c *caddy.Controller) error {
 	if err != nil {
 		return err
 	}
-
-	err = handler.Parse(c)
-	if err != nil {
-		return err
+	for c.Next() {
+		err = handler.Parse(c)
+		if err != nil {
+			return err
+		}
 	}
 
 >>>>>>> 1d2acb0 (feat(capsule): labels selector)

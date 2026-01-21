@@ -69,7 +69,6 @@ func (h *Capsule) Parse(c *caddy.Controller) error {
 				if err != nil {
 					return fmt.Errorf("unable to parse namespace_label selector value: '%v': %w", namespaceLabelSelectorString, err)
 				}
-
 				h.namespaceLabelSelector = nls
 
 				continue
