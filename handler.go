@@ -24,7 +24,6 @@ type Capsule struct {
 
 func (h *Capsule) Setup() error {
 	var err error
-
 	h.dnsController, err = newDNSController()
 	if err != nil {
 		log.Errorf("failed to create DNS controller: %v", err)

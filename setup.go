@@ -17,17 +17,15 @@ const pluginName = "capsule"
 func init() { plugin.Register(pluginName, setup) }
 
 func setup(c *caddy.Controller) error {
-	log.Info("setup called")
+	handler := &Capsule{}
+
+	err := handler.Setup()
+	if err != nil {
+		return err
+	}
+
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
-		handler := &Capsule{Next: next}
-
-		err := handler.Setup()
-		if err != nil {
-			log.Errorf("setup error: %v", err)
-
-			return nil
-		}
-
+		handler.Next = next
 		return handler
 	})
 	//nolint:forcetypeassert

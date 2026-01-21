@@ -34,7 +34,7 @@ func newDNSController() (*dnsController, error) {
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 
 	reverseIpInformers := []cache.SharedIndexInformer{}
