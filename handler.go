@@ -48,30 +48,39 @@ func (h *Capsule) Parse(c *caddy.Controller) error {
 			args := c.RemainingArgs()
 			if len(args) > 0 {
 				labelSelectorString := strings.Join(args, " ")
+
 				ls, err := meta.ParseToLabelSelector(labelSelectorString)
 				if err != nil {
-					return fmt.Errorf("unable to parse label selector value: '%v': %v", labelSelectorString, err)
+					return fmt.Errorf("unable to parse label selector value: '%v': %w", labelSelectorString, err)
 				}
+
 				h.labelSelector = ls
+
 				continue
 			}
+
 			return c.ArgErr()
 		case "namespace_labels":
 			args := c.RemainingArgs()
 			if len(args) > 0 {
 				namespaceLabelSelectorString := strings.Join(args, " ")
+
 				nls, err := meta.ParseToLabelSelector(namespaceLabelSelectorString)
 				if err != nil {
-					return fmt.Errorf("unable to parse namespace_label selector value: '%v': %v", namespaceLabelSelectorString, err)
+					return fmt.Errorf("unable to parse namespace_label selector value: '%v': %w", namespaceLabelSelectorString, err)
 				}
+
 				h.namespaceLabelSelector = nls
+
 				continue
 			}
+
 			return c.ArgErr()
 		default:
 			return c.Errf("unknown property '%s'", c.Val())
 		}
 	}
+
 	return nil
 }
 
@@ -100,7 +109,7 @@ func (h *Capsule) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 
 	log.Infof("query: %s %s from %s DestIP %s", r.Question[0].Name, dns.TypeToString[r.Question[0].Qtype], state.IP(), destIp)
 
-	if !h.dnsController.TenantAuthorized(state.IP(), destIp) {
+	if !h.dnsController.TenantAuthorized(state.IP(), destIp, *h) {
 		log.Info("blocking request due to tenant isolation policy")
 		log.Infof("QName: %s", state.QName())
 

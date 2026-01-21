@@ -182,7 +182,7 @@ func (c *dnsController) HasSynced() bool {
 	return c.hasSynced
 }
 
-func (c *dnsController) getObjectByIP(ip string) (*v1.Namespace, interface{}, error) {
+func (c *dnsController) getObjectByIP(ip string) (*v1.Namespace, any, error) {
 	for _, informer := range c.reverseIpInformers {
 		for _, key := range informer.GetIndexer().ListKeys() {
 			objs, err := informer.GetIndexer().ByIndex(key, ip)
@@ -198,6 +198,7 @@ func (c *dnsController) getObjectByIP(ip string) (*v1.Namespace, interface{}, er
 =======
 			log.Infof("Found object %s in namespace %s for IP %s", meta.GetName(), meta.GetNamespace(), ip)
 			ns, err := c.getNSByName(meta.GetNamespace())
+
 			return ns, objs[0], err
 >>>>>>> 1d2acb0 (feat(capsule): labels selector)
 		}
