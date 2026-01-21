@@ -6,6 +6,7 @@ package capsule_coredns
 import (
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/client-go/informers"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -134,8 +135,8 @@ func (d *dnsController) Start() {
 	<-d.stopCh
 }
 
-func (c *dnsController) TenantAuthorized(from string, to string) bool {
-	nsFrom, err := c.getNSByIP(from)
+func (c *dnsController) TenantAuthorized(from string, to string, h Capsule) bool {
+	nsFrom, _, err := c.getObjectByIP(from)
 	if err != nil || nsFrom == nil {
 		return true
 	}
@@ -150,9 +151,24 @@ func (c *dnsController) TenantAuthorized(from string, to string) bool {
 		return true
 	}
 
-	nsTo, err := c.getNSByIP(to)
+	nsTo, obj, err := c.getObjectByIP(to)
 	if err != nil || nsTo == nil {
 		return true
+	}
+
+	svc, isSvc := obj.(*v1.Service)
+	if isSvc && h.labelSelector != nil {
+		selector, err := metav1.LabelSelectorAsSelector(h.labelSelector)
+		if err == nil && selector.Matches(labels.Set(svc.Labels)) {
+			return true
+		}
+	}
+
+	if h.namespaceLabelSelector != nil {
+		selector, err := metav1.LabelSelectorAsSelector(h.namespaceLabelSelector)
+		if err == nil && selector.Matches(labels.Set(nsTo.Labels)) {
+			return true
+		}
 	}
 
 	if tenantTo, ok = nsTo.Labels[CapsuleTenantLabel]; !ok {
@@ -166,7 +182,7 @@ func (c *dnsController) HasSynced() bool {
 	return c.hasSynced
 }
 
-func (c *dnsController) getNSByIP(ip string) (*v1.Namespace, error) {
+func (c *dnsController) getObjectByIP(ip string) (*v1.Namespace, interface{}, error) {
 	for _, informer := range c.reverseIpInformers {
 		for _, key := range informer.GetIndexer().ListKeys() {
 			objs, err := informer.GetIndexer().ByIndex(key, ip)
@@ -177,11 +193,17 @@ func (c *dnsController) getNSByIP(ip string) (*v1.Namespace, error) {
 			//nolint:forcetypeassert
 			meta := objs[0].(*metav1.ObjectMeta)
 
+<<<<<<< HEAD
 			return c.getNSByName(meta.Namespace)
+=======
+			log.Infof("Found object %s in namespace %s for IP %s", meta.GetName(), meta.GetNamespace(), ip)
+			ns, err := c.getNSByName(meta.GetNamespace())
+			return ns, objs[0], err
+>>>>>>> 1d2acb0 (feat(capsule): labels selector)
 		}
 	}
 
-	return nil, nil
+	return nil, nil, nil
 }
 
 func (c *dnsController) getNSByName(name string) (*v1.Namespace, error) {

@@ -17,7 +17,22 @@ const pluginName = "capsule"
 func init() { plugin.Register(pluginName, setup) }
 
 func setup(c *caddy.Controller) error {
+<<<<<<< HEAD
 	log.Info("setup called")
+=======
+	handler := &Capsule{}
+
+	err := handler.Setup()
+	if err != nil {
+		return err
+	}
+
+	err = handler.Parse(c)
+	if err != nil {
+		return err
+	}
+
+>>>>>>> 1d2acb0 (feat(capsule): labels selector)
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
 		handler := &Capsule{Next: next}
 
