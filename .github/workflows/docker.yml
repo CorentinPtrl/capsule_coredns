@@ -3,12 +3,8 @@ name: Docker
 
 on:
   push:
-    branches:
-      - "*"
-  pull_request:
-    branches:
-      - "*"
-  workflow_dispatch:
+    tags:
+      - "v*"
 
 jobs:
   docker:

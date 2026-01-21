@@ -34,7 +34,7 @@ func newDNSController() (*dnsController, error) {
 
 	clientset, err := kubernetes.NewForConfig(config)
 	if err != nil {
-		panic(err.Error())
+		return nil, err
 	}
 
 	reverseIpInformers := []cache.SharedIndexInformer{}
@@ -46,9 +46,9 @@ func newDNSController() (*dnsController, error) {
 			//nolint:forcetypeassert
 			pod := obj.(*v1.Pod)
 
-			var ips []string
-			for _, ip := range pod.Status.PodIPs {
-				ips = append(ips, ip.IP)
+			ips := make([]string, 0, len(pod.Status.PodIPs))
+			for _, podIP := range pod.Status.PodIPs {
+				ips = append(ips, podIP.IP)
 			}
 
 			return ips, nil
@@ -66,11 +66,7 @@ func newDNSController() (*dnsController, error) {
 			//nolint:forcetypeassert
 			svc := obj.(*v1.Service)
 
-			var ips []string
-
-			ips = append(ips, svc.Spec.ClusterIPs...)
-
-			return ips, nil
+			return svc.Spec.ClusterIPs, nil
 		},
 	})
 	if err != nil {
@@ -107,7 +103,7 @@ func (d *dnsController) Start() {
 		d.stopCh = make(chan struct{})
 	}
 
-	synced := []cache.InformerSynced{}
+	synced := make([]cache.InformerSynced, 0, len(d.reverseIpInformers)+1)
 
 	log.Infof("Starting capsule controller")
 
@@ -116,6 +112,10 @@ func (d *dnsController) Start() {
 
 		synced = append(synced, ctrl.HasSynced)
 	}
+
+	go d.nsInformer.Run(d.stopCh)
+
+	synced = append(synced, d.nsInformer.HasSynced)
 
 	log.Infof("Waiting for controllers to sync")
 
@@ -132,6 +132,7 @@ func (d *dnsController) Start() {
 	log.Infof("Synced all required resources")
 
 	<-d.stopCh
+	log.Infof("Stopping capsule controller")
 }
 
 func (c *dnsController) TenantAuthorized(from string, to string) bool {
@@ -168,16 +169,18 @@ func (c *dnsController) HasSynced() bool {
 
 func (c *dnsController) getNSByIP(ip string) (*v1.Namespace, error) {
 	for _, informer := range c.reverseIpInformers {
-		for _, key := range informer.GetIndexer().ListKeys() {
+		for key := range informer.GetIndexer().GetIndexers() {
 			objs, err := informer.GetIndexer().ByIndex(key, ip)
 			if err != nil || len(objs) == 0 {
 				continue
 			}
 
 			//nolint:forcetypeassert
-			meta := objs[0].(*metav1.ObjectMeta)
+			meta := objs[0].(metav1.ObjectMetaAccessor).GetObjectMeta()
 
-			return c.getNSByName(meta.Namespace)
+			log.Infof("Found object %s in namespace %s for IP %s", meta.GetName(), meta.GetNamespace(), ip)
+
+			return c.getNSByName(meta.GetNamespace())
 		}
 	}
 
