@@ -199,7 +199,7 @@ func (c *dnsController) getObjectByIP(ip string) (*v1.Namespace, any, error) {
 			ns, err := c.getNSByName(meta.GetNamespace())
 
 			return ns, objs[0], err
-    }
+		}
 	}
 
 	return nil, nil, nil
