@@ -123,7 +123,7 @@ docker-build:
 # Running e2e tests in a KinD instance
 .PHONY: e2e
 e2e: ginkgo
-	$(MAKE) docker-build && $(MAKE) e2e-build && $(MAKE) e2e-exec
+	$(MAKE) docker-build && $(MAKE) e2e-build && $(MAKE) e2e-exec && $(MAKE) e2e-destroy
 
 e2e-build: kind
 	$(MAKE) e2e-build-cluster

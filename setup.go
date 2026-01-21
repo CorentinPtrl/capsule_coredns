@@ -24,6 +24,13 @@ func setup(c *caddy.Controller) error {
 		return err
 	}
 
+	for c.Next() {
+		err = handler.Parse(c)
+		if err != nil {
+			return err
+		}
+	}
+
 	dnsserver.GetConfig(c).AddPlugin(func(next plugin.Handler) plugin.Handler {
 		handler.Next = next
 

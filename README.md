@@ -16,7 +16,7 @@ By default, CoreDNS allows DNS resolution of any pod or service from any other p
 - Logging and error handling for plugin setup
 
 ## Requirements
-- Go 1.24 or newer
+- Go 1.25 or newer
 - CoreDNS (compatible version)
 - Kubernetes plugin enabled
 
@@ -25,7 +25,10 @@ Configure CoreDNS to use the Capsule plugin by adding it to your Corefile. Ensur
 
 Example Corefile snippet:
 ```
-capsule
+capsule {
+    namespace_labels capsule.io/dns=enabled
+    labels capsule.io/expose-dns=true
+}
 kubernetes cluster.local in-addr.arpa ip6.arpa {
    pods insecure
    fallthrough in-addr.arpa ip6.arpa

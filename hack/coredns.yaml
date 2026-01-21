@@ -128,7 +128,9 @@ data:
            lameduck 5s
         }
         ready
-        capsule
+        capsule {
+           namespace_labels capsule.io/dns=enabled
+        }
         kubernetes cluster.local in-addr.arpa ip6.arpa {
            pods insecure
            fallthrough in-addr.arpa ip6.arpa
@@ -150,4 +152,11 @@ kind: ConfigMap
 metadata:
   name: coredns
   namespace: kube-system
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    capsule.io/dns: enabled
+  name: default
 
