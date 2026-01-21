@@ -25,7 +25,10 @@ Configure CoreDNS to use the Capsule plugin by adding it to your Corefile. Ensur
 
 Example Corefile snippet:
 ```
-capsule
+capsule {
+    namespace_labels capsule.io/dns=enabled
+    labels capsule.io/expose-dns=true
+}
 kubernetes cluster.local in-addr.arpa ip6.arpa {
    pods insecure
    fallthrough in-addr.arpa ip6.arpa
