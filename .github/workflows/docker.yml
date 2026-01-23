@@ -34,28 +34,8 @@ jobs:
         with:
           go-version-file: 'go.mod'
 
-      - name: Prepare CoreDNS with Capsule Plugin
+      - name: Build and Push CoreDNS with Capsule Plugin
         run: |
-          git clone https://github.com/coredns/coredns
-          cd coredns
-          mkdir -p plugin/capsule
-          cp ../*.go plugin/capsule
-          cp ../go.mod plugin/capsule
-          sed -i "/^go /a replace github.com/CorentinPtrl/capsule_coredns => ./plugin/capsule" go.mod
-          sed -i '/kubernetes:kubernetes/i capsule:github.com\/CorentinPtrl\/capsule_coredns' plugin.cfg
-          GOFLAGS=-mod=mod go generate
-          go mod tidy
-          GOFLAGS="-buildvcs=false" make gen && GOFLAGS="-buildvcs=false" make
-
-      - name: Build and push
-        uses: docker/build-push-action@v6
-        with:
-          context: ./coredns
-          file: ./coredns/Dockerfile
-          platforms: linux/amd64
-          push: true
-          build-args: |
-            GOLANG_VERSION=${{ steps.versions.outputs.golang }}
-          tags: |
-            ghcr.io/corentinptrl/capsule_coredns:latest
-            ghcr.io/corentinptrl/capsule_coredns:${{ github.ref_name }}
+          make -f Makefile.release docker-build
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
