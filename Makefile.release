@@ -58,5 +58,4 @@ else
 	docker manifest create --amend $(DOCKER_IMAGE_NAME):latest $(DOCKER_IMAGE_LIST_VERSIONED)
 	docker manifest push --purge $(DOCKER_IMAGE_NAME):$(VERSION)
 	docker manifest push --purge $(DOCKER_IMAGE_NAME):latest
-	@make NAME=$(NAME) VERSION=$(VERSION) -f Makefile.release clean-registry
 endif
