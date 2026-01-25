@@ -17,8 +17,11 @@ docker-build:
 	@sed -i '/^capsule:github.com\/CorentinPtrl\/capsule_coredns/d' coredns/plugin.cfg
 	@grep -q '^capsule:github.com/CorentinPtrl/capsule_coredns' coredns/plugin.cfg || \
 		sed -i '/kubernetes:kubernetes/i capsule:github.com/CorentinPtrl/capsule_coredns' coredns/plugin.cfg
+	@cd coredns && GOFLAGS=-mod=mod go generate
+	@cd coredns && go mod tidy
+	@cd coredns && GOFLAGS="-buildvcs=false" make gen
 	@rm -rf coredns/build
-	@cd coredns && make -f Makefile.release build
+	@cd coredns && GOFLAGS="-buildvcs=false" make -f Makefile.release build
 	@mv coredns/build/linux coredns/build/docker
 	@cd coredns && make NAME=capsule_coredns DOCKER=ghcr.io/corentinptrl VERSION=$(VERSION) -f Makefile.docker docker-build
 	@make NAME=capsule_coredns DOCKER=ghcr.io/corentinptrl VERSION=$(VERSION) -f Makefile.release docker-multiarch
