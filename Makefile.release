@@ -26,12 +26,10 @@ docker-build:
 
 .PHONY: clean-registry
 clean-registry:
-	@echo "Cleaning up old versions from GHCR..."; \
 	for arch in $(LINUX_ARCH); do \
 		version_id=$$(curl -s -H "Authorization: Bearer $$GHCR_TOKEN" -H "Accept: application/vnd.github.v3+json" \
 			"https://api.github.com/users/CorentinPtrl/packages/container/$(NAME)/versions" | \
 			jq -r ".[] | select(.metadata.container.tags != null and (.metadata.container.tags[]==\"$${arch}-$(VERSION)\")) | .id"); \
-		echo "Value: $$version_id" ; \
 		if [ -n "$version_id" ]; then \
 			curl -s -X DELETE -H "Accept: application/vnd.github.v3+json" -H "Authorization: Bearer $$GHCR_TOKEN" \
 				"https://api.github.com/users/CorentinPtrl/packages/container/$(NAME)/versions/$$version_id"; \
