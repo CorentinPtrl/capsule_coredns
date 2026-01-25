@@ -1,4 +1,4 @@
-// Copyright 2020-2025 Project Capsule Authors
+// Copyright 2025-2026 PITREL Corentin
 // SPDX-License-Identifier: Apache-2.0
 
 package capsule_coredns
