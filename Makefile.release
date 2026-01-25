@@ -1,0 +1,62 @@
+DOCKER_IMAGE_NAME:=$(DOCKER)/$(NAME)
+LINUX_ARCH:=amd64 arm arm64 mips64le ppc64le s390x riscv64
+VERSION				 ?= $(or $(shell git describe --abbrev=0 --tags --match "v*" 2>/dev/null),$(GIT_HEAD_COMMIT))
+DOCKER_IMAGE_LIST_VERSIONED:=$(shell echo $(LINUX_ARCH) | sed -e "s~mips64le ~~g" | sed -e "s~[^ ]*~$(DOCKER_IMAGE_NAME):&\-$(VERSION)~g")
+
+.PHONY: docker-build
+
+docker-build:
+	@if [ ! -d coredns ]; then \
+		git clone https://github.com/coredns/coredns; \
+	fi
+	@mkdir -p coredns/plugin/capsule
+	@cp -f *.go coredns/plugin/capsule/
+	@cp -f go.mod coredns/plugin/capsule/
+	@grep -q '^replace github.com/CorentinPtrl/capsule_coredns => ./plugin/capsule' coredns/go.mod || \
+		sed -i '/^go /a replace github.com/CorentinPtrl/capsule_coredns => ./plugin/capsule' coredns/go.mod
+	@sed -i '/^capsule:github.com\/CorentinPtrl\/capsule_coredns/d' coredns/plugin.cfg
+	@grep -q '^capsule:github.com/CorentinPtrl/capsule_coredns' coredns/plugin.cfg || \
+		sed -i '/kubernetes:kubernetes/i capsule:github.com/CorentinPtrl/capsule_coredns' coredns/plugin.cfg
+	@rm -rf coredns/build
+	@cd coredns && make -f Makefile.release build
+	@mv coredns/build/linux coredns/build/docker
+	@cd coredns && make NAME=capsule_coredns DOCKER=ghcr.io/corentinptrl VERSION=$(VERSION) -f Makefile.docker docker-build
+	@make NAME=capsule_coredns DOCKER=ghcr.io/corentinptrl VERSION=$(VERSION) -f Makefile.release docker-multiarch
+
+
+.PHONY: clean-registry
+clean-registry:
+	for arch in $(LINUX_ARCH); do \
+		version_id=$$(curl -s -H "Authorization: Bearer $$GHCR_TOKEN" -H "Accept: application/vnd.github.v3+json" \
+			"https://api.github.com/users/CorentinPtrl/packages/container/$(NAME)/versions" | \
+			jq -r ".[] | select(.metadata.container.tags != null and (.metadata.container.tags[]==\"$${arch}-$(VERSION)\")) | .id"); \
+		if [ -n "$version_id" ]; then \
+			curl -s -X DELETE -H "Accept: application/vnd.github.v3+json" -H "Authorization: Bearer $$GHCR_TOKEN" \
+				"https://api.github.com/users/CorentinPtrl/packages/container/$(NAME)/versions/$$version_id"; \
+		else \
+			echo "Tag ${arch}-$(VERSION) not found."; \
+		fi; \
+	done
+
+
+.PHONY: docker-multiarch
+docker-multiarch:
+ifeq ($(VERSION),)
+	$(error "Please specify a version use. Use VERSION=<version>")
+endif
+ifeq ($(DOCKER),)
+	$(error "Please specify Docker registry to use. Use DOCKER=coredns for releases")
+else
+	@# Pushes coredns/coredns-$arch:$version images
+	@# Creates manifest for multi-arch image
+	@# Pushes multi-arch image to coredns/coredns:$version
+	@echo Pushing: $(VERSION) to $(DOCKER_IMAGE_NAME)
+	for arch in $(LINUX_ARCH); do \
+		docker push $(DOCKER_IMAGE_NAME):$${arch}-$(VERSION) ;\
+	done
+	docker manifest create --amend $(DOCKER_IMAGE_NAME):$(VERSION) $(DOCKER_IMAGE_LIST_VERSIONED)
+	docker manifest create --amend $(DOCKER_IMAGE_NAME):latest $(DOCKER_IMAGE_LIST_VERSIONED)
+	docker manifest push --purge $(DOCKER_IMAGE_NAME):$(VERSION)
+	docker manifest push --purge $(DOCKER_IMAGE_NAME):latest
+	@make NAME=$(NAME) VERSION=$(VERSION) -f Makefile.release clean-registry
+endif
