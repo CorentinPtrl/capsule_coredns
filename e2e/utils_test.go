@@ -34,8 +34,8 @@ import (
 )
 
 const (
-	defaultTimeoutInterval   = 40 * time.Second
-	defaultPollInterval      = time.Second
+	defaultTimeoutInterval   = 60 * time.Second
+	defaultPollInterval      = 2 * time.Second
 	defaultConfigurationName = "default"
 )
 
