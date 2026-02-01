@@ -194,8 +194,6 @@ func (c *dnsController) getObjectByIP(ip string) (*v1.Namespace, any, error) {
 			//nolint:forcetypeassert
 			meta := objs[0].(metav1.ObjectMetaAccessor).GetObjectMeta()
 
-			log.Infof("Found object %s in namespace %s for IP %s", meta.GetName(), meta.GetNamespace(), ip)
-
 			ns, err := c.getNSByName(meta.GetNamespace())
 
 			return ns, objs[0], err

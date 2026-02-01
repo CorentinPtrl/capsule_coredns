@@ -107,12 +107,7 @@ func (h *Capsule) ServeDNS(ctx context.Context, w dns.ResponseWriter, r *dns.Msg
 		return h.Next.ServeDNS(ctx, w, r)
 	}
 
-	log.Infof("query: %s %s from %s DestIP %s", r.Question[0].Name, dns.TypeToString[r.Question[0].Qtype], state.IP(), destIp)
-
 	if !h.dnsController.TenantAuthorized(state.IP(), destIp, *h) {
-		log.Info("blocking request due to tenant isolation policy")
-		log.Infof("QName: %s", state.QName())
-
 		return plugin.BackendError(ctx, h.kubernetesHandler, zone, dns.RcodeSuccess, state, nil, plugin.Options{})
 	}
 
@@ -124,7 +119,7 @@ func (h *Capsule) GetDestIp(ctx context.Context, state request.Request, zone str
 	case dns.TypeA:
 		records, _, err := plugin.A(ctx, h.kubernetesHandler, zone, state, nil, plugin.Options{})
 		if err != nil {
-			log.Infof("kubernetes.Records error: %v", err)
+			return "", err
 		}
 
 		if len(records) == 0 {
