@@ -2,12 +2,13 @@ DOCKER_IMAGE_NAME:=$(DOCKER)/$(NAME)
 LINUX_ARCH:=amd64 arm arm64 mips64le ppc64le s390x riscv64
 VERSION				 ?= $(or $(shell git describe --abbrev=0 --tags --match "v*" 2>/dev/null),$(GIT_HEAD_COMMIT))
 DOCKER_IMAGE_LIST_VERSIONED:=$(shell echo $(LINUX_ARCH) | sed -e "s~mips64le ~~g" | sed -e "s~[^ ]*~$(DOCKER_IMAGE_NAME):&\-$(VERSION)~g")
+COREDNS_VERSION ?= v1.13.2
 
 .PHONY: docker-build
 
 docker-build:
 	@if [ ! -d coredns ]; then \
-		git clone https://github.com/coredns/coredns; \
+		git clone --branch $(COREDNS_VERSION) https://github.com/coredns/coredns ; \
 	fi
 	@mkdir -p coredns/plugin/capsule
 	@cp -f *.go coredns/plugin/capsule/

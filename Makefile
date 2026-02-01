@@ -95,11 +95,13 @@ define go-install-tool
 }
 endef
 
+COREDNS_VERSION ?= v1.13.2
+
 .PHONY: docker-build
 
 docker-build:
 	@if [ ! -d coredns ]; then \
-		git clone https://github.com/coredns/coredns; \
+		git clone --branch $(COREDNS_VERSION) https://github.com/coredns/coredns; \
 	fi
 	@mkdir -p coredns/plugin/capsule
 	@cp -f *.go coredns/plugin/capsule/

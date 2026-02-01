@@ -1,4 +1,4 @@
-// Copyright 2020-2026 Project Capsule Authors.
+// Copyright 2025-2026 PITREL Corentin
 // SPDX-License-Identifier: Apache-2.0
 
 package e2e
@@ -18,7 +18,7 @@ import (
 	"github.com/projectcapsule/capsule/pkg/api"
 )
 
-var _ = Describe("DNS resolution from tenant namespace to cluster DNS", Label("dns"), func() {
+var _ = Describe("DNS resolution from tenant namespace to whitelisted namespace (default)", Label("dns"), func() {
 	var (
 		nsName  = "tenant-dns-test-ns"
 		podName = "dns-test-pod"
